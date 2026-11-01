@@ -4,5 +4,7 @@ set -e
 D=$(dirname "$(readlink -f "$0")")
 install -m755 "$D/start-cosmic-patched"   /usr/local/bin/start-cosmic-patched
 install -m644 "$D/cosmic-patched.desktop" /usr/share/wayland-sessions/cosmic-patched.desktop
-install -m644 "$D/cosmic-patches.hook"    /etc/pacman.d/hooks/cosmic-patches.hook
+# The hook starts the rebuild as the user who owns this checkout.
+sed "s/@USER@/$(stat -c %U "$D")/" "$D/cosmic-patches.hook" > /etc/pacman.d/hooks/cosmic-patches.hook
+chmod 644 /etc/pacman.d/hooks/cosmic-patches.hook
 rm -f /etc/pacman.d/hooks/cosmic-comp-gaps.hook
