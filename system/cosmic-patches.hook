@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = cosmic-*
+
+[Action]
+Description = Queueing rebuild of locally patched COSMIC components...
+When = PostTransaction
+Exec = /bin/sh -c '/usr/bin/systemctl --user -M nemeth@ start --no-block cosmic-patches-rebuild.service || true'

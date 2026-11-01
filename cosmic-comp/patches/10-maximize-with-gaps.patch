@@ -1,0 +1,120 @@
+diff --git a/src/shell/grabs/moving.rs b/src/shell/grabs/moving.rs
+index f1fbfa8a..0bd8f2e3 100644
+--- a/src/shell/grabs/moving.rs
++++ b/src/shell/grabs/moving.rs
+@@ -342,7 +342,9 @@ impl SnappingZone {
+         gaps: (i32, i32),
+     ) -> Rectangle<i32, Local> {
+         match self {
+-            SnappingZone::Maximize => non_exclusive_geometry.as_local(),
++            SnappingZone::Maximize => {
++                TiledCorners::Full.relative_geometry(non_exclusive_geometry, gaps)
++            }
+             SnappingZone::Top => TiledCorners::Top.relative_geometry(non_exclusive_geometry, gaps),
+             SnappingZone::TopLeft => {
+                 TiledCorners::TopLeft.relative_geometry(non_exclusive_geometry, gaps)
+@@ -977,16 +979,12 @@ impl Drop for MoveGrab {
+                                 let pre_drag_geometry = *window.last_geometry.lock().unwrap();
+ 
+                                 if sz == SnappingZone::Maximize {
+-                                    shell.maximize_toggle(
+-                                        &window,
+-                                        &seat,
+-                                        &state.common.event_loop_handle,
+-                                    );
+-                                    if let Some(geo) = pre_drag_geometry
+-                                        && let Some(state) =
+-                                            window.maximized_state.lock().unwrap().as_mut()
+-                                    {
+-                                        state.original_geometry = geo;
++                                    // Patched: snap to the full area with gaps instead of a real maximize
++                                    workspace
++                                        .floating_layer
++                                        .snap_element(&window, TiledCorners::Full);
++                                    if let Some(geo) = pre_drag_geometry {
++                                        *window.last_geometry.lock().unwrap() = Some(geo);
+                                     }
+                                 } else {
+                                     let directions = match sz {
+diff --git a/src/shell/layout/floating/mod.rs b/src/shell/layout/floating/mod.rs
+index 95d7264d..5d2c69ce 100644
+--- a/src/shell/layout/floating/mod.rs
++++ b/src/shell/layout/floating/mod.rs
+@@ -178,6 +178,7 @@ pub enum TiledCorners {
+     BottomLeft,
+     Left,
+     TopLeft,
++    Full,
+ }
+ 
+ impl TiledCorners {
+@@ -188,6 +189,13 @@ impl TiledCorners {
+     ) -> Rectangle<i32, Local> {
+         let (_, inner) = gaps;
+         let (loc, size) = match self {
++            TiledCorners::Full => (
++                Point::from((output_geometry.loc.x + inner, output_geometry.loc.y + inner)),
++                Size::from((
++                    output_geometry.size.w - inner * 2,
++                    output_geometry.size.h - inner * 2,
++                )),
++            ),
+             TiledCorners::Bottom => (
+                 Point::from((
+                     output_geometry.loc.x + inner,
+@@ -1669,6 +1677,55 @@ impl FloatingLayout {
+         }
+     }
+ 
++    /// Snap a floating element to the given tiled state, animated (like keyboard snapping).
++    pub fn snap_element(&mut self, element: &CosmicMapped, new_state: TiledCorners) {
++        let output = self.space.outputs().next().unwrap().clone();
++        let layers = layer_map_for_output(&output);
++        let output_geometry = layers.non_exclusive_zone();
++        std::mem::drop(layers);
++
++        let Some(current_geometry) = self.space.element_geometry(element).map(RectExt::as_local)
++        else {
++            return;
++        };
++        let mut tiled_state = element.floating_tiled.lock().unwrap();
++        let start_rectangle = if let Some(anim) = self.animations.remove(element) {
++            anim.geometry(
++                output_geometry,
++                current_geometry,
++                tiled_state.as_ref(),
++                self.gaps(),
++            )
++        } else {
++            current_geometry
++        };
++
++        let new_geo = new_state.relative_geometry(output_geometry, self.gaps());
++        element.set_tiled(true);
++        element.set_maximized(false);
++
++        if tiled_state.is_none() {
++            let last_geometry = element
++                .maximized_state
++                .lock()
++                .unwrap()
++                .take()
++                .map(|state| state.original_geometry)
++                .or(Some(current_geometry));
++            *element.last_geometry.lock().unwrap() = last_geometry;
++        }
++        *tiled_state = Some(new_state);
++        std::mem::drop(tiled_state);
++
++        element.moved_since_mapped.store(true, Ordering::SeqCst);
++        self.map_internal(
++            element.clone(),
++            Some(new_geo.loc),
++            Some(new_geo.size.as_logical()),
++            Some(start_rectangle),
++        );
++    }
++
+     pub fn snap_to_corner(&self, mapped: &CosmicMapped, corners: &TiledCorners) {
+         *mapped.floating_tiled.lock().unwrap() = Some(*corners);
+         mapped.set_tiled(true);
