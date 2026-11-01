@@ -1,31 +1,18 @@
 #!/bin/sh
-# Session launcher for "COSMIC (patched)". Installed to /usr/local/bin.
-# Same as start-cosmic, but binaries from ~/git/cosmic-patches/<component>/bin are put first
-# in PATH — only for components built for the currently installed package version.
-# Anything stale or missing falls back to the stock /usr/bin binary.
+# Session launcher for "COSMIC (patched)". install-system-files.sh copies it to
+# /usr/local/bin and fills in @ROOT@ (this checkout). Same as start-cosmic, but the
+# bin/ folder of each patched component goes first in PATH, only if it was built
+# for the installed package version. Anything stale or missing runs stock.
 
 # Do start-cosmic's login-shell step ourselves, so the shell profile can't reorder PATH after us.
 if [ -n "${SHELL:-}" ] && [ "${1:-}" != "--in-login-shell" ]; then
     exec "$SHELL" -l -c "$0 --in-login-shell"
 fi
 
-ROOT="$HOME/git/cosmic-patches"
-RUN="${XDG_RUNTIME_DIR:-/tmp}/cosmic-patched-bin"
-rm -rf "$RUN"; mkdir -p "$RUN"
-
-for dir in "$ROOT"/*/; do
-    dir=${dir%/}; comp=$(basename "$dir")
-    [ -d "$dir/bin" ] || continue
-    PKG="$comp"
-    [ -f "$dir/component.conf" ] && . "$dir/component.conf"
-    installed=$(pacman -Q "$PKG" 2>/dev/null | cut -d' ' -f2)
-    if [ -n "$installed" ] && [ "$(cat "$dir/version" 2>/dev/null)" = "$installed" ]; then
-        for b in "$dir"/bin/*; do
-            [ -x "$b" ] && ln -sf "$b" "$RUN/"
-        done
-    fi
+for dir in "@ROOT@"/*/; do
+    built=$(cat "${dir}version" 2>/dev/null) || continue    # e.g. "cosmic-comp 1:1.10.0-1.1"
+    [ "$(pacman -Q "${built%% *}" 2>/dev/null)" = "$built" ] && PATH="${dir}bin:$PATH"
 done
 
-export PATH="$RUN:$PATH"
-export COSMIC_PATCHED=1
+export PATH COSMIC_PATCHED=1
 exec /usr/bin/start-cosmic --in-login-shell

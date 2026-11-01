@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=COSMIC (patched)
-Comment=COSMIC with locally patched components from ~/git/cosmic-patches
+Comment=COSMIC with locally patched components (cosmic-patches)
 Exec=/usr/local/bin/start-cosmic-patched
 Type=Application
 DesktopNames=COSMIC

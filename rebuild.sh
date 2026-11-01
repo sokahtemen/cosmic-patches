@@ -1,17 +1,19 @@
 #!/bin/sh
-# Rebuild every patched COSMIC component in ~/git/cosmic-patches/<component>/ whose build
-# doesn't match the installed pacman package. Components already up to date are skipped.
+# Rebuild every patched COSMIC component in this folder whose build doesn't match
+# the installed pacman package. Components already up to date are skipped.
 #
 # Component layout:
 #   <component>/src/            git clone of the upstream repo
 #   <component>/patches/*.patch applied in name order on top of the release tag
-#   <component>/component.conf  optional: PKG, BINS, TAG (see cosmic-comp/component.conf)
-#   <component>/bin/, version   build output (written by this script)
+#   <component>/component.conf  optional: PKG (pacman package) and BINS (binaries
+#                               to install); both default to the folder name
+#   <component>/bin/, version   build output, written by this script; version holds
+#                               the `pacman -Q` line the build was made for
 #
 # Usage: rebuild.sh [component ...]   (default: all components)
 set -u
 
-ROOT="$HOME/git/cosmic-patches"
+ROOT=$(dirname "$(readlink -f "$0")")
 status=0
 
 notify() { notify-send ${3:+-u "$3"} "COSMIC patches" "$1: $2" 2>/dev/null || true; }
@@ -20,24 +22,23 @@ build_component() (
     set -eu
     comp="$1"
     dir="$ROOT/$comp"
-    PKG="$comp"; BINS="$comp"; TAG='epoch-$upstream'
+    PKG="$comp"; BINS="$comp"
     [ -f "$dir/component.conf" ] && . "$dir/component.conf"
 
-    installed=$(pacman -Q "$PKG" 2>/dev/null | cut -d' ' -f2) || true
-    [ -n "$installed" ] || { echo "$comp: package $PKG not installed, skipping"; exit 0; }
-    upstream=$(echo "$installed" | sed 's/^[0-9]*://; s/-[^-]*$//')   # 1:1.10.0-1.1 -> 1.10.0
-    tag=$(eval "echo \"$TAG\"")
-
+    installed=$(pacman -Q "$PKG" 2>/dev/null) || { echo "$comp: package $PKG not installed, skipping"; exit 0; }
     if [ "$(cat "$dir/version" 2>/dev/null || true)" = "$installed" ]; then
         echo "$comp: already built for $installed"
         exit 0
     fi
+    ver=${installed#* }                                            # 1:1.10.0-1.1
+    tag=epoch-$(echo "$ver" | sed 's/^[0-9]*://; s/-[^-]*$//')     # epoch-1.10.0
 
-    fail() { echo "$comp: ERROR: $1" >&2; notify "$comp" "rebuild for $installed failed: $1 (stock version will be used)" critical; exit 1; }
+    fail() { echo "$comp: ERROR: $1" >&2; notify "$comp" "rebuild for $ver failed: $1 (stock version will be used)" critical; exit 1; }
 
-    notify "$comp" "rebuilding for $installed…"
+    notify "$comp" "rebuilding for $ver…"
     cd "$dir/src"
-    git fetch --quiet --tags origin || fail "git fetch failed"
+    # Offline is fine as long as the tag was fetched before.
+    git fetch --quiet --tags origin || echo "$comp: git fetch failed, using local tags" >&2
     git rev-parse -q --verify "refs/tags/$tag" >/dev/null || fail "no upstream tag $tag"
     git reset --quiet --hard
     git checkout --quiet "$tag"
@@ -54,11 +55,10 @@ build_component() (
         mv -f "$dir/bin/$b.new" "$dir/bin/$b"
     done
     echo "$installed" > "$dir/version"
-    notify "$comp" "rebuilt for $installed. Log out and back in to use it."
+    notify "$comp" "rebuilt for $ver. Log out and back in to use it."
 )
 
 if [ $# -eq 0 ]; then
-    set --
     for d in "$ROOT"/*/patches; do
         [ -d "$d" ] && set -- "$@" "$(basename "$(dirname "$d")")"
     done

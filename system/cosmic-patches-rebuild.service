@@ -1,0 +1,13 @@
+[Unit]
+Description=Rebuild locally patched COSMIC components if COSMIC was updated
+
+[Service]
+Type=oneshot
+ExecStart=%h/git/cosmic-patches/rebuild.sh
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+Environment=CARGO_BUILD_JOBS=2
+
+[Install]
+WantedBy=default.target
