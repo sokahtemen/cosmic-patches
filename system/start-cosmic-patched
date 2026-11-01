@@ -1,6 +1,6 @@
 #!/bin/sh
 # Session launcher for "COSMIC (patched)". Installed to /usr/local/bin.
-# Same as start-cosmic, but binaries from ~/cosmic-patches/<component>/bin are put first
+# Same as start-cosmic, but binaries from ~/git/cosmic-patches/<component>/bin are put first
 # in PATH — only for components built for the currently installed package version.
 # Anything stale or missing falls back to the stock /usr/bin binary.
 
@@ -9,7 +9,7 @@ if [ -n "${SHELL:-}" ] && [ "${1:-}" != "--in-login-shell" ]; then
     exec "$SHELL" -l -c "$0 --in-login-shell"
 fi
 
-ROOT="$HOME/cosmic-patches"
+ROOT="$HOME/git/cosmic-patches"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/cosmic-patched-bin"
 rm -rf "$RUN"; mkdir -p "$RUN"
 

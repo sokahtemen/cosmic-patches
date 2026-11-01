@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuild every patched COSMIC component in ~/cosmic-patches/<component>/ whose build
+# Rebuild every patched COSMIC component in ~/git/cosmic-patches/<component>/ whose build
 # doesn't match the installed pacman package. Components already up to date are skipped.
 #
 # Component layout:
@@ -11,7 +11,7 @@
 # Usage: rebuild.sh [component ...]   (default: all components)
 set -u
 
-ROOT="$HOME/cosmic-patches"
+ROOT="$HOME/git/cosmic-patches"
 status=0
 
 notify() { notify-send ${3:+-u "$3"} "COSMIC patches" "$1: $2" 2>/dev/null || true; }
