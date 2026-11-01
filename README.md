@@ -17,3 +17,10 @@ Locally patched COSMIC components. Everything not patched here stays the stock A
 - `cosmic-patches-rebuild.service` (user, at login, idle priority) runs `rebuild.sh`.
 - `/etc/pacman.d/hooks/cosmic-patches.hook` starts it after any `cosmic-*` upgrade.
 - System files live in `system/`; reinstall with `pkexec ~/cosmic-patches/system/install-system-files.sh`.
+
+## AI-generated
+
+This project is vibecoded: all of the code, patches and docs were written by
+[Claude Code](https://claude.com/claude-code) using **Claude Opus 5.5**
+(`claude-opus-5-5`) at **medium effort**. A human gave the directions and did
+the testing, but did not review the code line by line.
